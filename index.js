@@ -54,7 +54,7 @@ async function run() {
             const sort = req.query.sort;
             const query = {};
             const options = {
-                sort: {'price': sort}
+                sort: { 'price': sort === 'asc' ? 1 : -1 }
             }
             const result = await serviceCollections.find(query, options).toArray();
             res.send(result);
@@ -75,8 +75,8 @@ async function run() {
             // console.log(req.headers);
             // console.log(req.decoded.email);
             const email = req.query.email;
-            if(req.decoded.email !== req.query.email) {
-                return res.status(403).send({error: true, message: 'Forbidden Access'});
+            if (req.decoded.email !== req.query.email) {
+                return res.status(403).send({ error: true, message: 'Forbidden Access' });
             }
 
             let query = {};
