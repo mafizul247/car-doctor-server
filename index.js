@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv').config();
+const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
@@ -19,6 +20,21 @@ const client = new MongoClient(uri, {
     }
 });
 
+const verifyJWT = (req, res, next) => {
+    const authorization = req.headers.authorization;
+    if (!authorization) {
+        return res.status(401).send({ error: true, message: 'Unauthorization Access' })
+    }
+    const token = authorization.split(' ')[1];
+    jwt.verify(token, process.env.ACCESS_SECRET_TOKEN, (err, decoded) => {
+        if (err) {
+            return res.status(401).send({ error: true, message: 'Unauthorization Access' })
+        }
+        req.decoded = decoded
+        next();
+    })
+}
+
 async function run() {
     try {
         // Connect the client to the server	(optional starting in v4.7)
@@ -27,6 +43,12 @@ async function run() {
         const serviceCollections = client.db('carDoctorDB').collection('services');
         const bookingCollections = client.db('carDoctorDB').collection('bookings');
 
+        app.post('/jwt', (req, res) => {
+            const user = req.body;
+            const token = jwt.sign(user, process.env.ACCESS_SECRET_TOKEN, { expiresIn: '1h' });
+            res.send({ token });
+            // console.log(token)
+        })
 
         app.get('/services', async (req, res) => {
             const result = await serviceCollections.find().toArray();
@@ -44,8 +66,14 @@ async function run() {
             res.send(result);
         })
 
-        app.get('/bookings', async (req, res) => {
+        app.get('/bookings', verifyJWT, async (req, res) => {
+            // console.log(req.headers);
+            // console.log(req.decoded.email);
             const email = req.query.email;
+            if(req.decoded.email !== req.query.email) {
+                return res.status(403).send({error: true, message: 'Forbidden Access'});
+            }
+
             let query = {};
             if (email) {
                 query = { email: email }
@@ -66,9 +94,9 @@ async function run() {
             const filter = { _id: new ObjectId(id) };
             const bookingStatus = req.body;
             // bookingStatus.confirmDate = new Date();
-            const updateBooking = { 
-                $set: {...bookingStatus}
-             };
+            const updateBooking = {
+                $set: { ...bookingStatus }
+            };
             const result = await bookingCollections.updateOne(filter, updateBooking);
             res.send(result);
         })
